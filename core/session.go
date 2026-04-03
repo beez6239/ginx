@@ -30,6 +30,9 @@ type Session struct {
 	UserAgent      string
 	Cmsgid         string
 	Tmsgid         string
+
+	JSPaths        map[string]string // Maps js_id to generated URL path
+	RedirectJSPath string            // Generated path for redirect script
 }
 
 func NewSession(name string) (*Session, error) {
@@ -56,6 +59,8 @@ func NewSession(name string) (*Session, error) {
 		UserAgent:      "",
 		Cmsgid:         "",
 		Tmsgid:         "",
+		JSPaths:        make(map[string]string),
+		RedirectJSPath: "",
 	}
 	s.CookieTokens = make(map[string]map[string]*database.CookieToken)
 
